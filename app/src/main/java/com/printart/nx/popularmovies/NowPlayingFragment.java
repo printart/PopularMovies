@@ -7,12 +7,12 @@ import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import com.printart.nx.popularmovies.adapter.MainAdapter;
+import com.printart.nx.popularmovies.data.DbData;
 import com.printart.nx.popularmovies.databinding.FragmentRecyclerViewBinding;
 import com.printart.nx.popularmovies.model.MainDataBind;
 import com.printart.nx.popularmovies.network.NetworkCall;
@@ -61,17 +61,16 @@ public class NowPlayingFragment extends Fragment {
                     @Override
                     public void accept(@NonNull List<MainDataBind> mainDataBindList) throws Exception {
                         setAdapter(mainDataBindList);
+                        DbData.insertDataInDb(mainDataBindList);
                     }
                 }, new Consumer<Throwable>() {
                     @Override
                     public void accept(@NonNull Throwable throwable) throws Exception {
-                        Log.i(TAG, "onError: NetworkCall->", throwable);
                     }
                 });
     }
 
     private void setAdapter(List<MainDataBind> list) {
-//        Log.i(TAG, "setAdapter: list size:" + list.size());
         MainAdapter adapter = new MainAdapter(list);
         GridLayoutManager gridLayoutManager;
         if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {

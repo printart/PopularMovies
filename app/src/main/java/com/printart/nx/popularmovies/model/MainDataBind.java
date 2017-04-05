@@ -1,9 +1,14 @@
 package com.printart.nx.popularmovies.model;
 
 
+import android.util.Log;
+import android.view.View;
+
+import static android.content.ContentValues.TAG;
+
 public class MainDataBind {
 
-//    private static final String TAG = "FirstData";
+    //    private static final String TAG = "FirstData";
     private String mMovieTitle;
     private String mMovieOverview;
     private String mMovieReleaseDate;
@@ -43,5 +48,9 @@ public class MainDataBind {
 
     public String getMoviePosterUrl() {
         return mMoviePosterUrl;
+    }
+
+    public void doOnClickItemAction(View view, long movieId) {
+        Log.i(TAG, "Clicked:" + movieId);
     }
 }
