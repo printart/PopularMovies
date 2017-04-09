@@ -24,7 +24,7 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Consumer;
 
 
-public class NowPlayingFragment extends Fragment {
+public class TopratedFragment extends Fragment {
 
     private static final String TAG = "NowPlayingFragment";
     private RecyclerView mRecyclerView;
@@ -46,9 +46,9 @@ public class NowPlayingFragment extends Fragment {
     }
 
     private void startDataFetch() {
-        final String category = "now_playing";
+        final String category = "top_rated";
 
-        NetworkCall.networkCallStart(category, 0)
+        NetworkCall.networkCallStart(category)
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnNext(new Consumer<List<MainDataBind>>() {
                     @Override
