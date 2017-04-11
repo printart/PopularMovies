@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.printart.nx.popularmovies.adapter.MainAdapter;
+import com.printart.nx.popularmovies.data.DbDataCall;
 import com.printart.nx.popularmovies.databinding.FragmentRecyclerViewBinding;
 import com.printart.nx.popularmovies.model.MainDataBind;
 import com.printart.nx.popularmovies.network.NetworkCall;
@@ -20,20 +21,24 @@ import java.util.List;
 
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.annotations.NonNull;
-import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Consumer;
 
 
 public class PopularFragment extends Fragment {
 
-    private static final String TAG = "NowPlayingFragment";
+    private static final String TAG = "PopularFragment";
     private RecyclerView mRecyclerView;
-    private Disposable mDisposable;
+    private static final String CATEGORY = "popular";
+    private static final String TABLE = "popular";
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        startDataFetch();
+        if (DbDataCall.checkForLocalData(TABLE)) {
+            startDataDbFetch(TABLE);
+        } else {
+            startDataNetworkFetch(CATEGORY);
+        }
     }
 
 
@@ -45,10 +50,20 @@ public class PopularFragment extends Fragment {
         return nowPlayingBinding.getRoot();
     }
 
-    private void startDataFetch() {
-        final String category = "popular";
+    private void startDataDbFetch(String category) {
+//        Log.i(TAG, "startDataDbFetch: Called from SQL");
+        DbDataCall.dbListQuery(category)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Consumer<List<MainDataBind>>() {
+                    @Override
+                    public void accept(@NonNull List<MainDataBind> mainDataBinds) throws Exception {
+                        setAdapter(mainDataBinds);
+                    }
+                });
+    }
 
-        NetworkCall.networkCallStart(category,0)
+    private void startDataNetworkFetch(String category) {
+        NetworkCall.networkCallStart(category, 0)
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnNext(new Consumer<List<MainDataBind>>() {
                     @Override
@@ -59,7 +74,7 @@ public class PopularFragment extends Fragment {
                 .subscribe(new Consumer<List<MainDataBind>>() {
                     @Override
                     public void accept(@NonNull List<MainDataBind> mainDataBindList) throws Exception {
-                        NetworkCall.updateDbSecondRequest(mainDataBindList, category);
+                        NetworkCall.updateDbSecondRequest(mainDataBindList, CATEGORY);
                     }
                 });
 

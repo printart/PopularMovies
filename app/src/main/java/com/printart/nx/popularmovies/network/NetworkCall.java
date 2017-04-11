@@ -2,9 +2,6 @@ package com.printart.nx.popularmovies.network;
 
 
 import android.content.ContentValues;
-import android.content.Context;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.databinding.BindingAdapter;
 import android.net.Uri;
 import android.text.TextUtils;
@@ -13,7 +10,7 @@ import android.widget.ImageView;
 
 import com.printart.nx.popularmovies.R;
 import com.printart.nx.popularmovies.data.DbContract;
-import com.printart.nx.popularmovies.data.DbHelper;
+import com.printart.nx.popularmovies.data.DbDataCall;
 import com.printart.nx.popularmovies.model.MainDataBind;
 import com.squareup.picasso.Picasso;
 
@@ -31,8 +28,9 @@ import java.util.List;
 import javax.net.ssl.HttpsURLConnection;
 
 import io.reactivex.Observable;
+import io.reactivex.Observer;
 import io.reactivex.annotations.NonNull;
-import io.reactivex.functions.Consumer;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
 
@@ -44,32 +42,17 @@ public class NetworkCall {
     private static final String APPEND_TO_RESPONSE_PARAMETER = "append_to_response";
     private static String mApiKey;
     private static NetworkCall sNetworkCall;
-    private static SQLiteDatabase sDb;
     private static long mMovieId;
 
-    public static NetworkCall newInstance(Context context, String apiKey) {
+    public static NetworkCall newInstance(String apiKey) {
         if (sNetworkCall == null) {
             sNetworkCall = new NetworkCall();
         }
         mApiKey = apiKey;
-        sDb = DbHelper.newInstance(context.getApplicationContext()).getWritableDatabase();
         return sNetworkCall;
     }
 
     private NetworkCall() {
-    }
-
-    public static Observable<List<MainDataBind>> networkCallStart(String category) {
-        switch (category) {
-            case "now_playing":
-                return networkCallStart(category, 0);
-            case "popular":
-                return networkCallStart(category, 20000);
-            case "top_rated":
-                return networkCallStart(category, 10000);
-            default:
-                return null;
-        }
     }
 
     //pull data with delay
@@ -163,11 +146,11 @@ public class NetworkCall {
                     public Long apply(@NonNull MainDataBind mainDataBind) throws Exception {
                         switch (category) {
                             case "now_playing":
-                                return updateNowPlaying(mainDataBind);
+                                return DbDataCall.updateNowPlaying(mainDataBind);
                             case "popular":
-                                return updatePopular(mainDataBind);
+                                return DbDataCall.updatePopular(mainDataBind);
                             case "top_rated":
-                                return updateTopRated(mainDataBind);
+                                return DbDataCall.updateTopRated(mainDataBind);
                             default:
                                 return null;
                         }
@@ -176,6 +159,7 @@ public class NetworkCall {
                 .map(new Function<Long, String>() {
                     @Override
                     public String apply(@NonNull Long mId) throws Exception {
+                        mMovieId = mId;
                         return buildSecondRequestUrl(mId);
                     }
                 })
@@ -195,13 +179,28 @@ public class NetworkCall {
                 .map(new Function<ContentValues, Long>() {
                     @Override
                     public Long apply(@NonNull ContentValues contentValues) throws Exception {
-                        return updateDataInDb(contentValues, category);
+                        return DbDataCall.updateDataInDb(contentValues, category, mMovieId);
                     }
                 })
-                .subscribe(new Consumer<Long>() {
+                .subscribe(new Observer<Long>() {
                     @Override
-                    public void accept(@NonNull Long aLong) throws Exception {
-                        Log.i(TAG, "accept: movie inserted:" + aLong);
+                    public void onSubscribe(Disposable d) {
+
+                    }
+
+                    @Override
+                    public void onNext(Long aLong) {
+
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        Log.i(TAG, "onComplete: done");
                     }
                 });
     }
@@ -209,60 +208,24 @@ public class NetworkCall {
     private static String buildSecondRequestUrl(long movieId) {
 //        https://api.themoviedb.org/3/movie/321612/videos?api_key
         String baseUrl = "https://api.themoviedb.org/3/movie/";
-        return Uri.parse(baseUrl).buildUpon()
+
+        String uri = Uri.parse(baseUrl).buildUpon()
                 .appendPath(String.valueOf(movieId))
                 .appendQueryParameter(API_KEY_QUERY_PARAMETER, mApiKey)
                 .appendQueryParameter(APPEND_TO_RESPONSE_PARAMETER, "videos")
                 .build().toString();
+//        Log.i(TAG, "buildSecondRequestUrl: uri:" + uri);
+        return uri;
     }
-
-    private static Long updateNowPlaying(@NonNull MainDataBind mainDataBind) {
-        ContentValues contentValues = new ContentValues();
-        contentValues.put(DbContract.NowPlaying.COLUMN_TITLE, mainDataBind.getMovieTitle());
-        contentValues.put(DbContract.NowPlaying.COLUMN_MOVIE_OVERVIEW, mainDataBind.getMovieOverview());
-        contentValues.put(DbContract.NowPlaying.COLUMN_RELEASE_DATE, mainDataBind.getMovieReleaseDate());
-        contentValues.put(DbContract.NowPlaying.COLUMN_VOTE_AVERAGE, mainDataBind.getMovieVoteAverage());
-        contentValues.put(DbContract.NowPlaying.COLUMN_MOVIE_ID, mainDataBind.getMovieId());
-        contentValues.put(DbContract.NowPlaying.COLUMN_POSTER_URL, mainDataBind.getMoviePosterUrl());
-        sDb.insert(DbContract.NowPlaying.TABLE, null, contentValues);
-        mMovieId = mainDataBind.getMovieId();
-        return mMovieId;
-    }
-
-    private static Long updatePopular(@NonNull MainDataBind mainDataBind) {
-        ContentValues contentValues = new ContentValues();
-        contentValues.put(DbContract.Popular.COLUMN_TITLE, mainDataBind.getMovieTitle());
-        contentValues.put(DbContract.Popular.COLUMN_MOVIE_OVERVIEW, mainDataBind.getMovieOverview());
-        contentValues.put(DbContract.Popular.COLUMN_RELEASE_DATE, mainDataBind.getMovieReleaseDate());
-        contentValues.put(DbContract.Popular.COLUMN_VOTE_AVERAGE, mainDataBind.getMovieVoteAverage());
-        contentValues.put(DbContract.Popular.COLUMN_MOVIE_ID, mainDataBind.getMovieId());
-        contentValues.put(DbContract.Popular.COLUMN_POSTER_URL, mainDataBind.getMoviePosterUrl());
-        sDb.insert(DbContract.Popular.TABLE, null, contentValues);
-        mMovieId = mainDataBind.getMovieId();
-        return mMovieId;
-    }
-
-    private static Long updateTopRated(@NonNull MainDataBind mainDataBind) {
-        ContentValues contentValues = new ContentValues();
-        contentValues.put(DbContract.TopRated.COLUMN_TITLE, mainDataBind.getMovieTitle());
-        contentValues.put(DbContract.TopRated.COLUMN_MOVIE_OVERVIEW, mainDataBind.getMovieOverview());
-        contentValues.put(DbContract.TopRated.COLUMN_RELEASE_DATE, mainDataBind.getMovieReleaseDate());
-        contentValues.put(DbContract.TopRated.COLUMN_VOTE_AVERAGE, mainDataBind.getMovieVoteAverage());
-        contentValues.put(DbContract.TopRated.COLUMN_MOVIE_ID, mainDataBind.getMovieId());
-        contentValues.put(DbContract.TopRated.COLUMN_POSTER_URL, mainDataBind.getMoviePosterUrl());
-        sDb.insert(DbContract.TopRated.TABLE, null, contentValues);
-        mMovieId = mainDataBind.getMovieId();
-        return mMovieId;
-    }
-
 
     //second data data
     private static ContentValues parseJsonSecondRequest(String json, String category) {
         ContentValues contentValues = new ContentValues();
         try {
             JSONObject job1 = new JSONObject(json);
-            String revenue = String.valueOf(job1.getInt("revenue") != 0 ? job1.getInt("revenue") : "0");
-            String runTime = String.valueOf(job1.getInt("runtime") != 0 ? job1.getInt("runtime") : "0");
+            String revenue = job1.getInt("revenue") == 0 ? null : String.valueOf(job1.getInt("revenue"));
+            String runTime = job1.getInt("runtime") == 0 ? null : String.valueOf(job1.getInt("runtime"));
+
             JSONObject job2 = job1.getJSONObject("videos");
             JSONArray jar1 = job2.getJSONArray("results");
             switch (category) {
@@ -270,8 +233,8 @@ public class NetworkCall {
                     contentValues.put(DbContract.NowPlaying.COLUMN_REVENUE, revenue);
                     contentValues.put(DbContract.NowPlaying.COLUMN_RUNTIME, runTime);
                     if (jar1.length() == 0) {
-                        contentValues.put(DbContract.NowPlaying.COLUMN_TRAILER_LINK1, "emp");
-                        contentValues.put(DbContract.NowPlaying.COLUMN_TRAILER_LINK2, "emp");
+                        contentValues.put(DbContract.NowPlaying.COLUMN_TRAILER_LINK1, "");
+                        contentValues.put(DbContract.NowPlaying.COLUMN_TRAILER_LINK2, "");
                     } else {
                         if (jar1.length() == 1) {
                             contentValues.put(DbContract.NowPlaying.COLUMN_TRAILER_LINK1, buildSecondRequestYoutubeUrl(jar1.getJSONObject(0).getString("key")));
@@ -285,8 +248,8 @@ public class NetworkCall {
                     contentValues.put(DbContract.Popular.COLUMN_REVENUE, revenue);
                     contentValues.put(DbContract.Popular.COLUMN_RUNTIME, runTime);
                     if (jar1.length() == 0) {
-                        contentValues.put(DbContract.Popular.COLUMN_TRAILER_LINK1, "emp");
-                        contentValues.put(DbContract.Popular.COLUMN_TRAILER_LINK2, "emp");
+                        contentValues.put(DbContract.Popular.COLUMN_TRAILER_LINK1, "");
+                        contentValues.put(DbContract.Popular.COLUMN_TRAILER_LINK2, "");
                     } else {
                         if (jar1.length() == 1) {
                             contentValues.put(DbContract.Popular.COLUMN_TRAILER_LINK1, buildSecondRequestYoutubeUrl(jar1.getJSONObject(0).getString("key")));
@@ -300,8 +263,8 @@ public class NetworkCall {
                     contentValues.put(DbContract.TopRated.COLUMN_REVENUE, revenue);
                     contentValues.put(DbContract.TopRated.COLUMN_RUNTIME, runTime);
                     if (jar1.length() == 0) {
-                        contentValues.put(DbContract.TopRated.COLUMN_TRAILER_LINK1, "emp");
-                        contentValues.put(DbContract.TopRated.COLUMN_TRAILER_LINK2, "emp");
+                        contentValues.put(DbContract.TopRated.COLUMN_TRAILER_LINK1, "");
+                        contentValues.put(DbContract.TopRated.COLUMN_TRAILER_LINK2, "");
                     } else {
                         if (jar1.length() == 1) {
                             contentValues.put(DbContract.TopRated.COLUMN_TRAILER_LINK1, buildSecondRequestYoutubeUrl(jar1.getJSONObject(0).getString("key")));
@@ -326,58 +289,6 @@ public class NetworkCall {
         return Uri.parse(baseUrl).buildUpon()
                 .appendPath("watch")
                 .appendQueryParameter(VIDEO_QUERY_PARAMETER, movieIdKey).build().toString();
-    }
-
-    public static long updateDataInDb(ContentValues contentValues, String category) {
-        String where;
-        String[] args = {String.valueOf(mMovieId)};
-        switch (category) {
-            case "now_playing":
-                where = DbContract.NowPlaying.COLUMN_MOVIE_ID + "=?";
-                return sDb.update(DbContract.NowPlaying.TABLE, contentValues, where, args);
-            case "popular":
-                where = DbContract.Popular.COLUMN_MOVIE_ID + "=?";
-                return sDb.update(DbContract.Popular.TABLE, contentValues, where, args);
-            case "top_rated":
-                where = DbContract.TopRated.COLUMN_MOVIE_ID + "=?";
-                return sDb.update(DbContract.TopRated.TABLE, contentValues, where, args);
-            default:
-                return 0;
-        }
-
-    }
-
-    private Observable<List<MainDataBind>> dbListQuery(String category) {
-        return Observable.just(category)
-                .subscribeOn(Schedulers.io())
-                .map(new Function<String, Cursor>() {
-                    @Override
-                    public Cursor apply(@NonNull String table) throws Exception {
-                        return sDb.query(table, null, null, null, null, null, null);
-                    }
-                })
-                .map(new Function<Cursor, List<MainDataBind>>() {
-                    @Override
-                    public List<MainDataBind> apply(@NonNull Cursor cursor) throws Exception {
-                        List<MainDataBind> mainDataBinds = new ArrayList<>();
-                        while (cursor.moveToNext()) {
-                            String title = cursor.getString(1);
-                            String overview = cursor.getString(2);
-                            String release = cursor.getString(3);
-                            double average = cursor.getDouble(4);
-                            long movieId = cursor.getLong(5);
-                            String poster = cursor.getString(6);
-                            String link1 = cursor.getString(7);
-                            String link2 = cursor.getString(8);
-                            String runtime = cursor.getString(9);
-                            String revenue = cursor.getString(10);
-                            mainDataBinds.add(new MainDataBind(title, overview, release, average, movieId, poster, revenue, runtime, link1, link2));
-                        }
-                        cursor.close();
-                        return mainDataBinds;
-                    }
-                });
-
     }
 
     // set image data binding
