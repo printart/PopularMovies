@@ -22,4 +22,4 @@ Unless required by applicable law or agreed to in writing, software distributed 
 
 ## Snap
 
-![Alt text](snp.png?raw=true "Popular Movies")
+<img src=snp.png width=40% height=50%/>
